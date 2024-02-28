@@ -83,10 +83,6 @@ class LinkedList():
         self.isRemoved=False
         if self.head==None:
             print('No elements in Linkedlist')
-        elif self.head.next==None:
-            if self.head.data==ele:
-                self.removeFirst()
-                self.isRemoved=True
         else:
             if(self.head.data==ele):
                self.removeFirst()
@@ -115,8 +111,9 @@ def main():
     list=[10,20,30,40]
     l.addAll(list)
     l.print_linkedlist()
-    l.remove(10)
+    l.remove(20)
     l.print_linkedlist()
 
     
 main()
+

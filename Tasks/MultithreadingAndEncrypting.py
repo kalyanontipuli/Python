@@ -23,6 +23,7 @@ def readTextFile(filepath,encrypt_value):
 
 path = input('Input:')
 encrypt_value=int(input('enter the encrypt value :'))
+threads=[]
 for dirpath,dirnames,filenames in os.walk(path):
     for x in filenames:
         filepath=dirpath+'/'+x
@@ -30,4 +31,8 @@ for dirpath,dirnames,filenames in os.walk(path):
         if(filepath.endswith('.txt')):
             t1=Thread(target=readTextFile,args=(filepath,encrypt_value,))
             t1.start()
-          
+            threads.append(thread)
+for thread in threads:
+    thread.join()
+
+print("All threads completed")

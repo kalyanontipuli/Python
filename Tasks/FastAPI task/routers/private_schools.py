@@ -1,11 +1,11 @@
 from typing import Annotated
 from fastapi import  APIRouter, Depends, FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel,Field, HttpUrl
 from sqlalchemy import func
 from starlette import status
 from sqlalchemy.orm import Session
-from models import PrivateSchools
-from database import SessionLocal
+from Models.models import PrivateSchools
+from Database.database import SessionLocal
 
 app=FastAPI()
 
@@ -24,7 +24,11 @@ router = APIRouter(
 
 
 class Private_School(BaseModel):
-    private_school_name:str
+    private_school_name:str=Field(min_length=3)
+
+def validate_private_school_id(private_school_id: int):
+    if private_school_id < 1:
+        raise HTTPException(status_code=404, detail="Private school ID must be greater than 0")
 
 @router.get("/", status_code=status.HTTP_200_OK)
 async def read_all(db:db_dependency):
@@ -32,6 +36,9 @@ async def read_all(db:db_dependency):
 
 @router.get("/school/{private_school_id}")
 async def get_school_by_id(db:db_dependency,private_school_id:int):
+    max_id = db.query(func.max(PrivateSchools.private_school_id)).scalar() or 0
+    if private_school_id<0:
+        raise HTTPException(status_code=404,detail="private school id must be greater than 0 and less than {}".format(max_id))
     school =  db.query(PrivateSchools).filter(PrivateSchools.private_school_id==private_school_id).first()
     if school is not None:
         return school
@@ -50,10 +57,10 @@ async def create_school(db: db_dependency, school: Private_School):
 
 @router.put("/school/{private_school_id}",status_code=status.HTTP_204_NO_CONTENT)
 async def update_subject(db:db_dependency,private_school_id:int,school:Private_School):
-
+    validate_private_school_id(private_school_id)
     school_model = db.query(PrivateSchools).filter(PrivateSchools.private_school_id==private_school_id).first()
     if school_model is None:
-        raise HTTPException(status_code=404,detail="subject not found")
+        raise HTTPException(status_code=404,detail="school not found")
     
     school_model.private_school_name = school.private_school_name
 
@@ -62,7 +69,7 @@ async def update_subject(db:db_dependency,private_school_id:int,school:Private_S
 
 @router.delete("/delete_private_school/{private_school_id}",status_code=status.HTTP_204_NO_CONTENT)
 async def delete_private_school(db:db_dependency,private_school_id:int):
-
+    validate_private_school_id(private_school_id)
     school = db.query(PrivateSchools).filter(PrivateSchools.private_school_id==private_school_id).first()
     if school is None:
         raise HTTPException(status_code=404,detail="Invalid school Id")

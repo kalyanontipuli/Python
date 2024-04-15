@@ -1,11 +1,11 @@
 from typing import Annotated
 from fastapi import  APIRouter, Depends, FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func
 from starlette import status
 from sqlalchemy.orm import Session
-from models import Publishers
-from database import SessionLocal
+from Models.models import Publishers
+from Database.database import SessionLocal
 
 app=FastAPI()
 
@@ -24,14 +24,20 @@ router = APIRouter(
 )
 
 class Publisher(BaseModel):
-    publisher_name:str
+    publisher_name:str=Field(min_length=3)
 
+
+def validate_publisher_id(publisher_id: int):
+    if publisher_id < 1:
+        raise HTTPException(status_code=404, detail="publisher ID must be greater than 0")
+    
 @router.get("/", status_code=status.HTTP_200_OK)
 async def read_all(db:db_dependency):
     return  db.query(Publishers).order_by(Publishers.publisher_id).all()
 
 @router.get("/publisher/{publisher_id}")
 async def get_school_by_id(db:db_dependency,publisher_id:int):
+    validate_publisher_id(publisher_id)
     publisher =  db.query(Publishers).filter(Publishers.publisher_id==publisher_id).first()
     if publisher is not None:
         return publisher
@@ -49,7 +55,7 @@ async def create_publisher(db:db_dependency,publisher:Publisher):
 
 @router.put("/{publisher_id}",status_code=status.HTTP_204_NO_CONTENT)
 async def update_publisher(db:db_dependency,publisher_id:int,publisher:Publisher):
-
+    validate_publisher_id(publisher_id)
     publisher_model = db.query(Publishers).filter(Publishers.publisher_id==publisher_id).first()
     if publisher_model is None:
         raise HTTPException(status_code=404,detail="subject not found")
@@ -60,7 +66,7 @@ async def update_publisher(db:db_dependency,publisher_id:int,publisher:Publisher
 
 @router.delete("/delete_publisher/{publisher_id}",status_code=status.HTTP_204_NO_CONTENT)
 async def delete_publisher(db:db_dependency,publisher_id:int):
-
+    validate_publisher_id(publisher_id)
     publisher = db.query(Publishers).filter(Publishers.publisher_id==publisher_id).first()
     if publisher is None:
         raise HTTPException(status_code=404,detail="Invalid publisher id")

@@ -1,10 +1,10 @@
 from typing import Annotated
-from fastapi import  APIRouter, Depends, FastAPI, HTTPException
-from pydantic import BaseModel
+from fastapi import  APIRouter, Depends, FastAPI, HTTPException,Path
+from pydantic import BaseModel,Field
 from starlette import status
 from sqlalchemy.orm import Session
-from models import TableOfContents
-from database import SessionLocal
+from Models.models import TableOfContents
+from Database.database import SessionLocal
 
 app=FastAPI()
 
@@ -19,8 +19,10 @@ db_dependency = Annotated[Session,Depends(get_db)]
 
 
 class Table_Of_Contents(BaseModel):
-    title:str
-    link_to_page:str
+    subject_id:int=Field(gt=0,description="subject  id should be greater than 0")
+    toc_id:int=Field(gt=0,description="toc_id should be greater than 0")
+    title:str=Field(min_length=3)
+    link_to_page:str=Field(min_length=5)
 
 
 router = APIRouter(
@@ -31,10 +33,14 @@ router = APIRouter(
 
 @router.get("/", status_code=status.HTTP_200_OK)
 async def read_all(db:db_dependency):
-    return  db.query(TableOfContents).all()
+    l = db.query(TableOfContents).all()
+    if l is not None:
+        return l
+    else:
+        raise HTTPException(status_code=404,detail="No Items found")
 
 @router.get("/contents/{subject_id}")
-async def get_contents_by_subject_id(db:db_dependency,subject_id:int):
+async def get_contents_by_subject_id(db:db_dependency,subject_id:int=Path(gt=0)):
     contents =  db.query(TableOfContents).filter(TableOfContents.subject_id==subject_id).all()
     if contents is not None:
         return contents
@@ -43,8 +49,7 @@ async def get_contents_by_subject_id(db:db_dependency,subject_id:int):
     
 @router.post("/contents",status_code=status.HTTP_201_CREATED)
 async def create_table_of_contents(db:db_dependency,toc:Table_Of_Contents):
-
-    toc_model  = TableOfContents(**toc.dict())
+    toc_model  = TableOfContents(subject_id=toc.subject_id,toc_id=toc.toc_id,title=toc.title,link_to_page=toc.link_to_page)
     db.add(toc_model)
     db.commit()
 
@@ -70,4 +75,3 @@ async def delete_subject(db:db_dependency,subject_id:int,toc_id:int):
     db.delete(toc)
     db.commit()
 
-    

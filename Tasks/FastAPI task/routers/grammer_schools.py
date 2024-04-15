@@ -1,11 +1,11 @@
 from typing import Annotated
 from fastapi import  APIRouter, Depends, FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func
 from starlette import status
 from sqlalchemy.orm import Session
-from models import GrammarSchools
-from database import SessionLocal
+from Models.models import GrammarSchools
+from Database.database import SessionLocal
 
 app=FastAPI()
 
@@ -24,8 +24,11 @@ router = APIRouter(
 )
 
 class Grammar_School(BaseModel):
-    grammer_school_name:str
+    grammer_school_name:str=Field(min_length=3)
 
+def validate_grammar_school_id(grammar_school_id: int):
+    if grammar_school_id < 1:
+        raise HTTPException(status_code=404, detail="grammar school ID must be greater than 0")
 
 @router.get("/", status_code=status.HTTP_200_OK)
 async def read_all(db:db_dependency):
@@ -33,6 +36,7 @@ async def read_all(db:db_dependency):
 
 @router.get("/school/{grammar_school_id}")
 async def get_school_by_id(db:db_dependency,grammar_school_id:int):
+    validate_grammar_school_id(grammar_school_id)
     school =  db.query(GrammarSchools).filter(GrammarSchools.grammar_school_id==grammar_school_id).first()
     if school is not None:
         return school
@@ -50,7 +54,7 @@ async def create_grammar_school(db:db_dependency,school:Grammar_School):
 
 @router.put("/school/{grammer_school_id}",status_code=status.HTTP_204_NO_CONTENT)
 async def update_subject(db:db_dependency,grammar_school_id:int,school:Grammar_School):
-
+    validate_grammar_school_id(grammar_school_id)
     school_model = db.query(GrammarSchools).filter(GrammarSchools.grammar_school_id==grammar_school_id).first()
     if school_model is None:
         raise HTTPException(status_code=404,detail="subject not found")
@@ -62,7 +66,7 @@ async def update_subject(db:db_dependency,grammar_school_id:int,school:Grammar_S
 
 @router.delete("/delete_grammar_school/{grammar_school_id}",status_code=status.HTTP_204_NO_CONTENT)
 async def delete_grammar_school(db:db_dependency,grammar_school_id:int):
-
+    validate_grammar_school_id(grammar_school_id)
     school = db.query(GrammarSchools).filter(GrammarSchools.grammar_school_id==grammar_school_id).first()
     if school is None:
         raise HTTPException(status_code=404,detail="Invalid school Id")

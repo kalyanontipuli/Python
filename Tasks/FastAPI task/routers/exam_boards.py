@@ -4,8 +4,8 @@ from pydantic import BaseModel
 from sqlalchemy import func
 from starlette import status
 from sqlalchemy.orm import Session
-from models import ExamBoards
-from database import SessionLocal
+from Models.models import ExamBoards
+from Database.database import SessionLocal
 
 app=FastAPI()
 
@@ -25,6 +25,9 @@ router = APIRouter(
 class Exam_Board(BaseModel):
     exam_board_name : str
 
+def validate_exam_board_id(exam_board_id: int):
+    if exam_board_id < 1:
+        raise HTTPException(status_code=404, detail="Exam board ID must be greater than 0")
 
 @router.get("/", status_code=status.HTTP_200_OK)
 async def read_all(db:db_dependency):
@@ -32,6 +35,7 @@ async def read_all(db:db_dependency):
 
 @router.get("/examboard/{exam_board_id}")
 async def get_school_by_id(db:db_dependency,exam_board_id:int):
+    validate_exam_board_id(exam_board_id)
     exam_board =  db.query(ExamBoards).filter(ExamBoards.exam_board_id==exam_board_id).first()
     if exam_board is not None:
         return exam_board
@@ -50,6 +54,7 @@ async def create_exam_board(db:db_dependency,exam_board:Exam_Board):
 @router.put("/examboard/{exam_board_id}",status_code=status.HTTP_204_NO_CONTENT)
 async def update_exam_board(db:db_dependency,exam_board_id:int,exam_board:Exam_Board):
 
+    validate_exam_board_id(exam_board_id)
     exam_board_model = db.query(ExamBoards).filter(ExamBoards.exam_board_id==exam_board_id).first()
     if exam_board_model is None:
         raise HTTPException(status_code=404,detail="subject not found")
@@ -60,7 +65,7 @@ async def update_exam_board(db:db_dependency,exam_board_id:int,exam_board:Exam_B
 
 @router.delete("/delete_exam_board/{exam_board_id}",status_code=status.HTTP_204_NO_CONTENT)
 async def delete_exam_board(db:db_dependency,exam_board_id:int):
-
+    validate_exam_board_id(exam_board_id)
     exam_board = db.query(ExamBoards).filter(ExamBoards.exam_board_id==exam_board_id).first()
     if exam_board is None:
         raise HTTPException(status_code=404,detail="Invalid exam board id")

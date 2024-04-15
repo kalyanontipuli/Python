@@ -1,15 +1,13 @@
 from typing import Annotated
 from fastapi import  APIRouter, Depends, FastAPI, HTTPException
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, Field
 from sqlalchemy import func
 from starlette import status
 from sqlalchemy.orm import Session
-from models import Papers
-from database import SessionLocal
-from routers.private_schools import Private_School
+from Models.models import Papers
+from Database.database import SessionLocal
 
 app=FastAPI()
-
 def get_db():
     db = SessionLocal()
     try:
@@ -22,11 +20,11 @@ db_dependency = Annotated[Session,Depends(get_db)]
 class Paper(BaseModel):
     __tablename__ = 'papers'
     
-    paper_name:str
-    subject_id :int
-    toc_id :int
-    year :int
-    link_to_paper :str
+    paper_name:str=Field(min_length=5)
+    subject_id :int=Field(gt=0)
+    toc_id :int=Field(gt=0)
+    year :int=Field(gt=1930)
+    link_to_paper :str=Field(min_length=10)
 
 class PaperName(BaseModel):
     paper_name: str
@@ -41,34 +39,39 @@ router = APIRouter(
     tags=['papers']
 )
 
+def validate_paper(paper_id: int):
+    if paper_id < 1:
+        raise HTTPException(status_code=404, detail="paper ID must be greater than 0")
+    
 
 @router.get("/", status_code=status.HTTP_200_OK)
-async def read_all(db:db_dependency):
-    papers=   db.query(Papers).order_by(Papers.paper_id).all()
-    
+async def read_all(db:db_dependency,skip:int=0,limit:int=10):
+    papers= db.query(Papers).order_by(Papers.paper_id).all()
     filtered_papers = []
     for paper in papers:
         filtered_paper = {}
-        
         for key, value in paper.__dict__.items():
             if value is not None:
                 filtered_paper[key] = value
         filtered_papers.append(filtered_paper)
-    return filtered_papers
+    return filtered_papers[skip:skip+limit]
+
 
 
 @router.get("/paper/{paper_id}")
 async def get_school_by_id(db:db_dependency,paper_id:int):
+    validate_paper(paper_id)
     paper =  db.query(Papers).filter(Papers.paper_id==paper_id).first()
+    max_id = db.query(func.max(Papers.paper_id)).scalar() or 0
     if paper is not None:
         return paper
     else:
-        raise HTTPException(status_code=404,detail='Subject Not found')
+        raise HTTPException(status_code=404,detail='paper Not found ensure paper id < {}'.format(max_id))
 
 @router.get("/english/{table_of_contents_id}")
 async def get_english_papers(db:db_dependency,table_of_contents_id:int):
-   
-
+    if table_of_contents_id<1:
+        raise HTTPException(status_code=404,detail="table of contents id must be greater than zero")
     result = []
     if table_of_contents_id==1:
 
@@ -76,7 +79,6 @@ async def get_english_papers(db:db_dependency,table_of_contents_id:int):
         for paper in private_english_papers:
             result.append({"private_school_id":paper.private_school_id,"paper_name":paper.paper_name,"paper_link":paper.link_to_paper})
         return result
-    
 
     elif table_of_contents_id==2:
         grammer_english_papers =  db.query(Papers.grammar_school_id,Papers.paper_name,Papers.link_to_paper).filter(Papers.toc_id==table_of_contents_id,Papers.subject_id==1).order_by(Papers.paper_name).all()
@@ -98,6 +100,8 @@ async def get_english_papers(db:db_dependency,table_of_contents_id:int):
     
 @router.get("/maths/{table_of_contents_id}")
 async def get_maths_papers(db:db_dependency,table_of_contents_id:int):
+    if table_of_contents_id<1:
+        raise HTTPException(status_code=404,detail="table of contents id must be greater than zero")
     
     result = []
     if table_of_contents_id==1:
@@ -127,6 +131,8 @@ async def get_maths_papers(db:db_dependency,table_of_contents_id:int):
     
 @router.get("/verbal-Reasoning/{table_of_contents_id}")
 async def get_verbal_Reasoning_papers(db:db_dependency,table_of_contents_id:int):
+    if table_of_contents_id<1:
+        raise HTTPException(status_code=404,detail="table of contents id must be greater than zero")
     
     result = []
     if table_of_contents_id==1:
@@ -155,6 +161,8 @@ async def get_verbal_Reasoning_papers(db:db_dependency,table_of_contents_id:int)
     
 @router.get("/non-verbal-Reasoning/{table_of_contents_id}")
 async def get_non_verbal_Reasoning_papers(db:db_dependency,table_of_contents_id:int):
+    if table_of_contents_id<1:
+        raise HTTPException(status_code=404,detail="table of contents id must be greater than zero")
     result = []
     if table_of_contents_id==1:
             papers =  db.query(Papers.exam_board_id,Papers.paper_name,Papers.link_to_paper).filter(Papers.toc_id==table_of_contents_id,Papers.subject_id==4).order_by(Papers.paper_name).all()
@@ -170,59 +178,10 @@ async def get_non_verbal_Reasoning_papers(db:db_dependency,table_of_contents_id:
         raise HTTPException(status_code=404,detail="table_of_content_id should between 1 and 2")
 
 
-
-# @router.post("/paper",status_code=status.HTTP_201_CREATED)
-# async def create_paper(db:db_dependency,paper:Paper):
-
-#     paper_model=""
-#     max_id = db.query(func.max(Papers.paper_id)).scalar() or 0
-#     new_id = max_id + 1
-
-#     if paper.private_school_id:
-#          if paper.grammar_school_id or paper.exam_board_id or paper.publisher_id:
-#              raise HTTPException(status_code=400, detail="Invalid input for a paper belonging to only one cateogry.")
-#          else:
-#              paper_model=Papers(paper_id=new_id,paper_name=paper.paper_name,
-#                                 subject_id=paper.subject_id,toc_id=paper.toc_id,
-#                                 private_school_id=paper.private_school_id,year=paper.year,
-#                                 link_to_paper=paper.link_to_paper)
-    
-
-#     elif paper.grammar_school_id:
-#          if paper.private_school_id or paper.exam_board_id or paper.publisher_id:
-#              raise HTTPException(status_code=400, detail="Invalid input for a paper belonging to only one cateogry.")
-#          else:
-#              paper_model=Papers(paper_id=new_id,paper_name=paper.paper_name,
-#                                 subject_id=paper.subject_id,toc_id=paper.toc_id,
-#                                 grammar_school_id=paper.grammar_school_id,year=paper.year,
-#                                 link_to_paper=paper.link_to_paper)
-
-#     elif paper.exam_board_id:
-#         if paper.private_school_id or paper.grammar_school_id or paper.publisher_id:
-#             raise HTTPException(status_code=400, detail="Invalid input for a paper belonging to only one cateogry.")
-#         else:
-#             paper_model=Papers(paper_id=new_id,paper_name=paper.paper_name,subject_id=paper.subject_id,
-#                                toc_id=paper.toc_id,exam_board_id=paper.exam_board_id,year=paper.year,
-#                                link_to_paper=paper.link_to_paper)
-    
-#     elif paper.publisher_id:
-#         if paper.private_school_id or paper.exam_board_id or paper.grammar_school_id:
-#             raise HTTPException(status_code=400, detail="Invalid input for a paper belonging to only one cateogry.")
-#         else:
-#             paper_model=Papers(paper_id=new_id,paper_name=paper.paper_name,subject_id=paper.subject_id,
-#                                toc_id=paper.toc_id,publisher_id=paper.publisher_id,year=paper.year,
-#                                link_to_paper=paper.link_to_paper)
-    
-#     if paper_model is None:
-#         raise HTTPException(status_code=400,detail="ensure to give values to paper cateogry")
-#     else:
-#         db.add(paper_model)
-#         db.commit()
-
-
-
 @router.post("/paper/{category_type}/{category_value}",status_code=status.HTTP_201_CREATED)
 async def create_paper(db:db_dependency,paper:Paper,category_type:int,category_value:int):
+    if category_type<1 or category_value<1:
+        raise HTTPException(status_code=404,detail="category value and type must be > 0")
 
     paper_model=""
     max_id = db.query(func.max(Papers.paper_id)).scalar() or 0
@@ -263,6 +222,8 @@ async def create_paper(db:db_dependency,paper:Paper,category_type:int,category_v
 
 @router.put("/update_paper_name/{paper_id}",status_code=status.HTTP_204_NO_CONTENT)
 async def update_paper_name(db:db_dependency,paper_id:int,paper_name:PaperName):
+
+    validate_paper(paper_id)
     
     paper_model=db.query(Papers).filter(Papers.paper_id==paper_id).first()
 
@@ -275,6 +236,7 @@ async def update_paper_name(db:db_dependency,paper_id:int,paper_name:PaperName):
 
 @router.put("/update_paper_link/{paper_id}",status_code=status.HTTP_204_NO_CONTENT)
 async def update_paper_link(db:db_dependency,paper_id:int,link_to_paper:PaperLink):
+    validate_paper(paper_id)
     
     paper_model=db.query(Papers).filter(Papers.paper_id==paper_id).first()
 
@@ -288,6 +250,7 @@ async def update_paper_link(db:db_dependency,paper_id:int,link_to_paper:PaperLin
 
 @router.put("/update_paper_year/{paper_id}",status_code=status.HTTP_204_NO_CONTENT)
 async def update_paper_year(db:db_dependency,paper_id:int,year:PaperYear):
+    validate_paper(paper_id)
     
     paper_model=db.query(Papers).filter(Papers.paper_id==paper_id).first()
 
@@ -301,6 +264,7 @@ async def update_paper_year(db:db_dependency,paper_id:int,year:PaperYear):
 
 @router.put("/update_paper/{paper_id}",status_code=status.HTTP_204_NO_CONTENT)
 async def update_paper(db:db_dependency,paper_id:int,paper:Paper):
+    validate_paper(paper_id)
     
     paper_model=db.query(Papers).filter(Papers.paper_id==paper_id).first()
 
@@ -312,34 +276,12 @@ async def update_paper(db:db_dependency,paper_id:int,paper:Paper):
     paper_model.toc_id = paper.toc_id
     paper_model.year = paper.year
     paper_model.link_to_paper =  paper.link_to_paper
-    # if paper_model.private_school_id:
-    #      if paper.grammar_school_id or paper.exam_board_id or paper.publisher_id:
-    #          raise HTTPException(status_code=400, detail="Invalid input for a paper belonging to only one cateogry.")
-    #      else:
-    #             paper_model.private_school_id = paper.private_school_id
-
-    # elif paper.grammar_school_id:
-    #      if paper.private_school_id or paper.exam_board_id or paper.publisher_id:
-    #          raise HTTPException(status_code=400, detail="Invalid input for a paper belonging to only one cateogry.")
-    #      else:
-    #          paper_model.grammer_school_id = paper.grammar_school_id
-    
-    # elif paper.exam_board_id:
-    #     if paper.private_school_id or paper.grammar_school_id or paper.publisher_id:
-    #         raise HTTPException(status_code=400, detail="Invalid input for a paper belonging to only one cateogry.")
-    #     else:
-    #         paper_model.exam_board_id = paper.exam_board_id
-    # elif paper.publisher_id:
-    #     if paper.private_school_id or paper.exam_board_id or paper.grammar_school_id:
-    #         raise HTTPException(status_code=400, detail="Invalid input for a paper belonging to only one cateogry.")
-    #     else:
-    #         paper_model.publisher_id = paper.publisher_id
-
     db.add(paper_model)
     db.commit()
 
 @router.delete("/delete-paper/{paper_id}",status_code=status.HTTP_204_NO_CONTENT)
 async def delete_paper(db:db_dependency,paper_id:int):
+    validate_paper(paper_id)
 
     paper = db.query(Papers).filter(Papers.paper_id==paper_id).first()
     if paper is None:
@@ -348,6 +290,5 @@ async def delete_paper(db:db_dependency,paper_id:int):
     db.delete(paper)
     db.commit()
     
-
 
 

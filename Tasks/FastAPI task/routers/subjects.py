@@ -1,11 +1,13 @@
+from email.policy import HTTP
 from typing import Annotated
-from fastapi import  APIRouter, Depends, FastAPI, HTTPException
-from pydantic import BaseModel
+from click import File
+from fastapi import  APIRouter, Depends, FastAPI, HTTPException,Path
+from pydantic import BaseModel,Field, HttpUrl
 from sqlalchemy import func
 from starlette import status
 from sqlalchemy.orm import Session
-from models import Subjects
-from database import SessionLocal
+from Models.models import Subjects
+from Database.database import SessionLocal
 
 app=FastAPI()
 
@@ -24,7 +26,7 @@ router = APIRouter(
 )
 
 class Subject(BaseModel):
-    name:str
+    name:str = Field(min_length=3)
 
 
 
@@ -33,12 +35,13 @@ async def read_all(db:db_dependency):
     return  db.query(Subjects).order_by(Subjects.subject_id).all()
 
 @router.get("/subject/{subject_id}")
-async def get_subject_by_id(db:db_dependency,subject_id:int):
+async def get_subject_by_id(db:db_dependency,subject_id:int=Path(gt=0)):
     subject =  db.query(Subjects).filter(Subjects.subject_id==subject_id).first()
+    max_id = db.query(func.max(Subjects.subject_id)).scalar() or 0
     if subject is not None:
         return subject
     else:
-        raise HTTPException(status_code=404,detail='Subject Not found')
+        raise HTTPException(status_code=404,detail="Id should between {} and {}".format(0,max_id+1))
 
 @router.post("/subject",status_code=status.HTTP_201_CREATED)
 async def add_subject(db:db_dependency,subject:Subject):
@@ -62,18 +65,14 @@ async def update_subject(db:db_dependency,subject_id:int,subject:Subject):
     
 @router.delete("/delete_subject/{subject_id}",status_code=status.HTTP_204_NO_CONTENT)
 async def delete_subject(db:db_dependency,subject_id:int):
-
+    max_id = db.query(func.max(Subjects.subject_id)).scalar() or 0
+    if subject_id<1:
+        raise HTTPException(status_code=404,detail='Subject id must be greater than 0')
+    elif subject_id>max_id:
+        raise HTTPException(status_code=404,detail='Id should between {} and {}'.format(0,max_id+1))
     subject = db.query(Subjects).filter(Subjects.subject_id==subject_id).first()
     if subject is None:
         raise HTTPException(status_code=404,detail="Invalid subject Id")
     
     db.delete(subject)
     db.commit()
-
-
-
-    
-
-
-
-    

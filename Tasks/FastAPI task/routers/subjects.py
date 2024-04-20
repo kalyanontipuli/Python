@@ -7,6 +7,9 @@ from sqlalchemy.orm import Session
 from Models.models import Subjects
 from Database.database import SessionLocal
 
+import logging
+logging.basicConfig(level=logging.INFO, filename="app.log", filemode="w", format="%(asctime)s - %(levelname)s - %(message)s")
+
 app=FastAPI()
 
 def get_db():
@@ -30,15 +33,19 @@ class Subject(BaseModel):
 
 @router.get("/", status_code=status.HTTP_200_OK)
 async def read_all(db:db_dependency):
+    logging.info("Read all endpoint accessed")
     return  db.query(Subjects).order_by(Subjects.subject_id).all()
 
 @router.get("/subject/{subject_id}")
 async def get_subject_by_id(db:db_dependency,subject_id:int=Path(gt=0)):
+    logging.info("subject with id {} accessed".format(subject_id))
     subject =  db.query(Subjects).filter(Subjects.subject_id==subject_id).first()
     max_id = db.query(func.max(Subjects.subject_id)).scalar() or 0
     if subject is not None:
+        logging.info("subject returned")
         return subject
     else:
+        logging.warning("user entered a wroung id")
         raise HTTPException(status_code=404,detail="Id should between {} and {}".format(0,max_id+1))
 
 @router.post("/subject",status_code=status.HTTP_201_CREATED)
